@@ -173,7 +173,6 @@ async fn translate(
 
     let resp = get_client()?
         .post("https://api.deepl.com/jsonrpc")
-        .header(header::USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"))
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::COOKIE, format!("dl_session={};", state.dl_session))
         .body(body)
@@ -319,6 +318,7 @@ impl Client {
         let mut builder = reqwest::Client::builder()
             .default_headers((|| {
                 let mut headers = header::HeaderMap::new();
+                headers.insert(header::USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"));
                 headers.insert(header::ACCEPT, HeaderValue::from_static("*/*"));
                 headers.insert(
                     header::ACCEPT_LANGUAGE,
