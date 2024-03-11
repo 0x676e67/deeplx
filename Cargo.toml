@@ -1,0 +1,69 @@
+[package]
+name = "deeplx"
+version = "0.1.0"
+edition = "2021"
+description = "DeepL Free API"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = { version = "1.0.111", features = ["preserve_order"] }
+anyhow = "1.0.79"
+daemonize = "0.5.0"
+clap = { version = "4.4.18", features = ["derive", "env"] }
+reqwest = { version = "0.11", features = ["json", "gzip", "deflate", "brotli"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+# actix
+actix-web = { version = "4", features = ["rustls-0_22"] }
+actix-cors = "0.7.0"
+actix-web-httpauth = "0.8.1"
+rustls = "0.22"
+rustls-pemfile = "2"
+rand = "0.8.5"
+
+[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
+version = "0.48.0"
+default-features = false
+features = ["Win32_System_Com_CallObj", "Win32_Foundation", "Win32_Globalization", "Win32_UI_Shell_Common"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+sysctl = "0.5.5"
+
+[target.'cfg(target_family = "unix")'.dependencies]
+daemonize = "0.5.0"
+nix = { version = "0.28.0", features = ["user", "signal"]}
+sysinfo = { version = "0.30.7", default-features = false }
+
+# allocator
+tcmalloc = { version = "0.3.0", optional = true }
+snmalloc-rs = { version = "0.3.4", optional = true }
+rpmalloc = { version = "0.2.2", optional = true }
+jemallocator = { package = "tikv-jemallocator", version = "0.5.4", optional = true }
+mimalloc = { version = "0.1.39", default-features = false, optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
+[features]
+default = []
+# Enable jemalloc for binaries
+jemalloc = ["jemallocator"]
+# Enable bundled tcmalloc
+tcmalloc = ["tcmalloc/bundled"]
+# Enable snmalloc for binaries
+snmalloc = ["snmalloc-rs"]
+# Enable bundled rpmalloc
+rpmalloc = ["dep:rpmalloc"]
+# Enable mimalloc for binaries
+mimalloc = ["dep:mimalloc"]
+
+
+[profile.release]
+lto = true
+opt-level = 's'
+codegen-units = 1
+strip = true
+panic = "abort"
