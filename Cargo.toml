@@ -19,10 +19,12 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 # actix
 actix-web = { version = "4", features = ["rustls-0_22"] }
 actix-cors = "0.7.0"
-actix-web-httpauth = "0.8.1"
 rustls = "0.22"
 rustls-pemfile = "2"
 rand = "0.8.5"
+
+# redb
+redb = "1.5.0"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows-sys]
 version = "0.48.0"
