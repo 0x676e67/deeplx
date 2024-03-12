@@ -12,11 +12,11 @@ use std::{
 use crate::BootArgs;
 use actix_web::{
     error,
+    http::header::HeaderMap,
     middleware::Logger,
     web::{self, Json},
-    App, Error, HttpResponse, HttpServer, Responder,
+    App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
 };
-use actix_web_httpauth::extractors::bearer::BearerAuth;
 use anyhow::Result;
 use rand::Rng;
 use reqwest::{
@@ -34,7 +34,6 @@ const TIMEOUT: u16 = 360;
 // This struct represents state
 struct AppState {
     api_key: Option<String>,
-    dl_session: String,
 }
 
 pub struct Serve(pub BootArgs);
@@ -55,8 +54,11 @@ impl Serve {
         let client = Client::new(self.0.proxies.clone())?;
         let _ = CLIENT.set(client);
 
+        // Init dl_session
+        db::insert_dl_session(self.0.dl_session.as_str())?;
+        db::insert_dl_session("40ef9830-ced3-4f4b-b391-35b98479110f")?;
+
         let api_key = self.0.api_key.clone();
-        let dl_session = self.0.dl_session.clone();
 
         api_key.as_ref().map(|_| {
             tracing::info!("API key is required");
@@ -78,7 +80,6 @@ impl Serve {
                 .wrap(Logger::default())
                 .app_data(web::Data::new(AppState {
                     api_key: api_key.clone(),
-                    dl_session: dl_session.clone(),
                 }))
                 .route("/", web::get().to(manual_hello))
                 .route("/translate", web::post().to(translate))
@@ -132,12 +133,12 @@ async fn manual_hello() -> impl Responder {
 }
 
 async fn translate(
-    req: Json<PayloadFree>,
-    auth: Option<BearerAuth>,
+    req: HttpRequest,
+    bdoy: Json<PayloadFree>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<impl Responder> {
     // Verify the API key
-    verify_api_key(auth, &state).await?;
+    verify_api_key(req.headers(), &state).await?;
     let id = get_random_number() + 1;
     let number_alternative = 0.clamp(0, 3);
 
@@ -147,15 +148,15 @@ async fn translate(
         "id": id,
         "params": {
             "texts": [{
-                "text": req.text,
+                "text": bdoy.text,
                 "requestAlternatives": number_alternative
             }],
             "splitting": "newlines",
             "lang": {
-                "source_lang_user_selected": req.source_lang.to_uppercase(),
-                "target_lang": req.target_lang.to_uppercase(),
+                "source_lang_user_selected": bdoy.source_lang.to_uppercase(),
+                "target_lang": bdoy.target_lang.to_uppercase(),
             },
-            "timestamp": get_timestamp(get_i_count(&req.text))?,
+            "timestamp": get_timestamp(get_i_count(&bdoy.text))?,
             "commonJobParams": {
                 "wasSpoken": false,
                 "transcribe_as": ""
@@ -171,19 +172,33 @@ async fn translate(
         body = body.replace("\"method\":\"", "\"method\": \"");
     }
 
+    let dl_session = db::get_dl_session().map_err(error::ErrorExpectationFailed)?;
+
     let resp = get_client()?
         .post("https://api.deepl.com/jsonrpc")
         .header(header::CONTENT_TYPE, "application/json")
-        .header(header::COOKIE, format!("dl_session={};", state.dl_session))
+        .header(header::COOKIE, format!("dl_session={dl_session};",))
         .body(body)
         .send()
         .await
         .map_err(error::ErrorBadGateway)?;
 
-    if resp.status() == StatusCode::TOO_MANY_REQUESTS {
-        return Err(error::ErrorTooManyRequests(
+    match resp.status() {
+        StatusCode::TOO_MANY_REQUESTS => {
+            return Err(error::ErrorTooManyRequests(
                 "Too many requests, your IP has been blocked by DeepL temporarily, please don't request it frequently in a short time."
             ));
+        }
+        // If the dl_session is invalid, remove it from the database
+        StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+            if let Some(err) = db::remove_dl_session(dl_session).err() {
+                tracing::error!("Failed to remove dl_session: {err}");
+            }
+            return Err(error::ErrorFailedDependency(
+                "Failed dependency, please check your request and try again.",
+            ));
+        }
+        _ => {}
     }
 
     let body = resp
@@ -231,8 +246,8 @@ async fn translate(
         "id": id,
         "data": data,
         "alternatives": alternatives,
-        "source_lang": req.source_lang,
-        "target_lang": req.target_lang,
+        "source_lang": bdoy.source_lang,
+        "target_lang": bdoy.target_lang,
         "method": "Free",
     });
 
@@ -241,13 +256,15 @@ async fn translate(
 }
 
 /// Verify the API key
-async fn verify_api_key(
-    auth: Option<BearerAuth>,
-    state: &web::Data<AppState>,
-) -> Result<(), Error> {
+async fn verify_api_key(headers: &HeaderMap, state: &web::Data<AppState>) -> Result<(), Error> {
+    let authorization = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.trim_start_matches("Bearer "));
+
     // Check if the API key is valid
-    if let (Some(auth), Some(ref api_key)) = (auth, &state.api_key) {
-        if auth.token().ne(api_key) {
+    if let (Some(auth), Some(ref api_key)) = (authorization, &state.api_key) {
+        if auth.ne(api_key) {
             return Err(actix_web::error::ErrorUnauthorized(
                 "You are not authorized",
             ));
@@ -390,4 +407,99 @@ fn default_source_text() -> String {
 
 fn default_target_lang() -> String {
     String::from("ZH")
+}
+
+mod db {
+    use anyhow::Result;
+    use redb::{Database, ReadableTable, TableDefinition};
+    use std::{
+        path::PathBuf,
+        sync::{
+            atomic::{AtomicU32, Ordering},
+            OnceLock,
+        },
+    };
+    const TABLE: TableDefinition<u32, &str> = TableDefinition::new("dl_session");
+    static DB: OnceLock<(AtomicU32, Database)> = OnceLock::new();
+
+    fn get_db() -> &'static (AtomicU32, Database) {
+        DB.get_or_init(|| {
+            let binding = std::env::current_exe().expect("Failed to get current directory");
+            let dir = binding.parent().expect("Failed to get parent directory");
+            (
+                AtomicU32::new(0),
+                Database::create(PathBuf::from(dir).join("deepl.db"))
+                    .expect("Failed to create database"),
+            )
+        })
+    }
+
+    // Round-robin dl_session
+    pub fn get_dl_session() -> Result<String> {
+        let (index, db) = get_db();
+        let read_txn = db.begin_read()?;
+        let table = read_txn.open_table(TABLE)?;
+        if table.is_empty()? {
+            return Err(anyhow::anyhow!("Failed to get dl_session"));
+        };
+
+        // round-robin
+        let len = table.len()? as u32;
+
+        let new = if len == 1 {
+            0
+        } else {
+            let mut old = index.load(Ordering::Relaxed);
+            let mut new;
+            loop {
+                new = (old + 1) % len;
+                match index.compare_exchange_weak(old, new, Ordering::SeqCst, Ordering::Relaxed) {
+                    Ok(_) => break,
+                    Err(x) => old = x,
+                }
+            }
+            new
+        };
+
+        // The ID of the dl_session is new + 1
+        let dl_session = table
+            .get(new + 1)?
+            .ok_or_else(|| anyhow::anyhow!("Failed to get dl_session"))?;
+        Ok(dl_session.value().to_owned())
+    }
+
+    // Insert dl_session
+    pub fn insert_dl_session(dl_session: &str) -> Result<()> {
+        let (_, db) = get_db();
+        let write_txn = db.begin_write()?;
+        {
+            let mut table = write_txn.open_table(TABLE)?;
+            let len = table.len()?;
+            table.insert((len + 1) as u32, dl_session)?;
+        }
+        write_txn.commit()?;
+        Ok(())
+    }
+
+    // Remove dl_session
+    pub fn remove_dl_session(dl_session: String) -> Result<()> {
+        let (_, db) = get_db();
+        // read dl_session
+        let read_txn = db.begin_read()?;
+        let table = read_txn.open_table(TABLE)?;
+        for value in table.iter()? {
+            let value = value?;
+            if value.1.value().eq(&dl_session) {
+                // remove dl_session
+                let write_txn = db.begin_write()?;
+                {
+                    let mut table = write_txn.open_table(TABLE)?;
+                    table.remove(value.0.value())?;
+                }
+                write_txn.commit()?;
+                break;
+            }
+        }
+        Ok(())
+    }
 }
