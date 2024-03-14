@@ -24,7 +24,7 @@ rustls-pemfile = "2"
 rand = "0.8.5"
 
 # redb
-redb = "1.5.0"
+redb = { package = "redb-32bit", version = "1.5.0" }
 
 [target.'cfg(target_os = "windows")'.dependencies.windows-sys]
 version = "0.48.0"
