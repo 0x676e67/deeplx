@@ -73,7 +73,7 @@ docker pull ghcr.io/gngpp/deeplx:latest
 然后，你可以使用 `docker run` 命令来运行这个镜像，例如：
 
 ```bash
-docker run -d -d --name deeplx -p 8000:8000 -t gngpp/deeplx:latest run
+docker run -d --name deeplx -p 8000:8000 -t gngpp/deeplx:latest run
 ```
 
 或者：
