@@ -19,11 +19,11 @@ Rust封装的DeepL Free API服务
 
 ### Features
 
- - 仅支持DeepL Pro
- - 支持WebUI/API登录
- - 支持翻译文本
- - 支持帐号池
- - 支持代理池
+- 仅支持DeepL Pro
+- 支持WebUI/API登录
+- 支持翻译文本
+- 支持帐号池
+- 支持代理池
 
 ### 安装
 
@@ -79,7 +79,7 @@ deeplx log
 第一次启动可以不设置`-dl-session`，那么就需要在浏览器打开: `http://localhost:8000/pool`，登录后，自动加入到帐号池中即可使用。
 
 3. 命令参考
-   
+
 ```bash
 > deeplx -h
 DeepL Free API
