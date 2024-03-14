@@ -124,11 +124,16 @@ impl Serve {
         let client = Client::new(self.0.proxies.clone())?;
         let _ = CLIENT.set(client);
 
+        // Init rearrange db
+        let _ = db::rearrange().map_err(|err| {
+            tracing::error!("Failed to rearrange dl_session: {err}");
+        });
+
         // Init dl_session
         self.0.dl_session.as_ref().map(|dl_session| {
-            if let Err(err) = db::insert_dl_session(dl_session) {
+            let _ = db::insert_dl_session(dl_session).map_err(|err| {
                 tracing::error!("Failed to insert dl_session: {err}");
-            }
+            });
         });
 
         let api_key = self.0.api_key.clone();
@@ -280,7 +285,7 @@ async fn translate(
         body = body.replace("\"method\":\"", "\"method\": \"");
     }
 
-    let dl_session = db::get_dl_session().map_err(error::ErrorExpectationFailed)?;
+    let dl_session = db::round_robin_dl_session().map_err(error::ErrorExpectationFailed)?;
 
     let resp = get_client()?
         .post("https://api.deepl.com/jsonrpc")
@@ -552,7 +557,7 @@ mod db {
     }
 
     /// Round-robin dl_session
-    pub fn get_dl_session() -> Result<String> {
+    pub fn round_robin_dl_session() -> Result<String> {
         let (index, db) = get_db();
         let read_txn = db.begin_read()?;
         let table = read_txn.open_table(TABLE)?;
@@ -585,6 +590,19 @@ mod db {
         Ok(dl_session.value().to_owned())
     }
 
+    fn get_dl_session_index(dl_session: &str) -> Result<u32> {
+        let (_, db) = get_db();
+        let read_txn = db.begin_read()?;
+        let read_table = read_txn.open_table(TABLE)?;
+        for value in read_table.iter()? {
+            let value = value?;
+            if value.1.value().eq(dl_session) {
+                return Ok(value.0.value());
+            }
+        }
+        Err(anyhow::anyhow!("Failed to get dl_session"))
+    }
+
     // Insert dl_session
     pub fn insert_dl_session(dl_session: &str) -> Result<()> {
         let (_, db) = get_db();
@@ -612,22 +630,65 @@ mod db {
     // Remove dl_session
     pub fn remove_dl_session(dl_session: String) -> Result<()> {
         let (_, db) = get_db();
-        // read dl_session
+
+        let key = get_dl_session_index(&dl_session)?;
+
+        // read transaction
         let read_txn = db.begin_read()?;
-        let table = read_txn.open_table(TABLE)?;
-        for value in table.iter()? {
-            let value = value?;
-            if value.1.value().eq(&dl_session) {
-                // remove dl_session
-                let write_txn = db.begin_write()?;
-                {
-                    let mut table = write_txn.open_table(TABLE)?;
-                    table.remove(value.0.value())?;
+        let read_table = read_txn.open_table(TABLE)?;
+
+        // write transaction
+        let write_txn = db.begin_write()?;
+        let mut new_table = Vec::new();
+
+        {
+            let mut write_table = write_txn.open_table(TABLE)?;
+            for value in read_table.iter()? {
+                let value = value?;
+
+                // If the value is not equal to the key, push it to the new_table
+                if value.0.value().ne(&key) {
+                    new_table.push(value.1.value().to_owned());
                 }
-                write_txn.commit()?;
-                break;
+
+                // remove all dl_session
+                write_table.remove(value.0.value())?;
+            }
+
+            // reinsert dl_session
+            for (i, value) in new_table.iter().enumerate() {
+                write_table.insert((i + 1) as u32, value.as_str())?;
             }
         }
+
+        write_txn.commit()?;
+
+        Ok(())
+    }
+
+    pub fn rearrange() -> Result<()> {
+        let (_, db) = get_db();
+        let mut new_table = Vec::new();
+        let write_txn = db.begin_write()?;
+        let read_txn = db.begin_read()?;
+        let read_table = read_txn.open_table(TABLE)?;
+
+        {
+            let mut write_table = write_txn.open_table(TABLE)?;
+            // reduce dl_session
+            for value in read_table.iter()? {
+                let (key, value) = value?;
+                write_table.remove(key.value())?;
+                new_table.push(value.value().to_owned());
+            }
+
+            // reinsert dl_session
+            for (i, value) in new_table.iter().enumerate() {
+                write_table.insert((i + 1) as u32, value.as_str())?;
+            }
+        }
+
+        write_txn.commit()?;
         Ok(())
     }
 }
