@@ -15,16 +15,12 @@
 
 Rust封装的`DeepL Free API`服务
 
-## [使用API教程](https://github.com/xiaozhou26/deeplx/blob/main/API.md)
-
-> 使用前提是你需要有一个DeepL Pro帐号
-
 ### Features
 
 - 仅支持DeepL Pro
 - 支持WebUI/API登录
 - 支持翻译文本
-- 支持帐号池
+- 支持池化
 - 支持代理池
 
 ### 安装
@@ -34,8 +30,8 @@ Rust封装的`DeepL Free API`服务
 GitHub Releases 中有预编译的二进制文件，以Ubuntu为例：
 
 ```bash
-wget https://github.com/gngpp/deeplx/releases/download/v0.1.0/deeplx-0.1.0-x86_64-unknown-linux-musl.tar.gz
-tar -xf deeplx-0.1.0-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/deeplx/releases/download/v0.1.1/deeplx-0.1.1-x86_64-unknown-linux-musl.tar.gz
+tar -xf deeplx-0.1.1-x86_64-unknown-linux-musl.tar.gz
 mv ./deeplx /bin/deeplx
 
 # 前台运行进程
@@ -99,7 +95,10 @@ docker run -d --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run --de
 ```
 
 在这些命令中，你需要将 `your_api_key`，`your_dl_session` 和 `your_proxies` 替换为你的实际值。
+
 ### 使用
+
+- [使用API教程](https://github.com/xiaozhou26/deeplx/blob/main/API.md)
 
 1. 启动参数说明
 
@@ -113,11 +112,9 @@ docker run -d --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run --de
 
 2. 启动
 
-第一次启动可以不设置`-dl-session`，那么就需要在浏览器打开: `http://localhost:8000/pool`，登录后，自动加入到帐号池中即可使用。
+第一次启动可以不设置`-dl-session`，那么就需要在浏览器打开: `http://localhost:8000/pool`，进行手动提交到`dl_session`池中。
 
-3. 命令参考
-
-
+1. 命令参考
 
 ```bash
 > deeplx -h
