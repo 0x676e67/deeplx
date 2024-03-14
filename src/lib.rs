@@ -60,7 +60,7 @@ pub struct BootArgs {
 
     /// Deepl `dl_session`
     #[clap(long)]
-    pub dl_session: String,
+    pub dl_session: Option<String>,
 
     /// Deepl client proxy
     #[clap(short = 'x',long, env = "PROXIES", value_parser = parse_proxies_url, verbatim_doc_comment)]
