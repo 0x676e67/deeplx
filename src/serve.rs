@@ -590,14 +590,17 @@ mod db {
         Ok(dl_session.value().to_owned())
     }
 
-    fn get_dl_session_index(dl_session: &str) -> Result<u32> {
+    fn get_dl_session_index(dl_session: &str) -> Result<(u32, Option<(u32, String)>)> {
         let (_, db) = get_db();
         let read_txn = db.begin_read()?;
         let read_table = read_txn.open_table(TABLE)?;
         for value in read_table.iter()? {
             let value = value?;
             if value.1.value().eq(dl_session) {
-                return Ok(value.0.value());
+                let last = read_table
+                    .last()?
+                    .map(|(k, v)| (k.value(), v.value().to_owned()));
+                return Ok((value.0.value(), last));
             }
         }
         Err(anyhow::anyhow!("Failed to get dl_session"))
@@ -631,37 +634,26 @@ mod db {
     pub fn remove_dl_session(dl_session: String) -> Result<()> {
         let (_, db) = get_db();
 
-        let key = get_dl_session_index(&dl_session)?;
+        let (key, last_key) = get_dl_session_index(&dl_session)?;
 
-        // read transaction
-        let read_txn = db.begin_read()?;
-        let read_table = read_txn.open_table(TABLE)?;
+        match last_key {
+            None => return Ok(()),
+            Some((last_key, last_value)) => {
+                // write transaction
+                let write_txn = db.begin_write()?;
+                {
+                    let mut write_table = write_txn.open_table(TABLE)?;
 
-        // write transaction
-        let write_txn = db.begin_write()?;
-        let mut new_table = Vec::new();
+                    // reinsert last key
+                    write_table.insert(key, last_value.as_str())?;
 
-        {
-            let mut write_table = write_txn.open_table(TABLE)?;
-            for value in read_table.iter()? {
-                let value = value?;
-
-                // If the value is not equal to the key, push it to the new_table
-                if value.0.value().ne(&key) {
-                    new_table.push(value.1.value().to_owned());
+                    // remove last key
+                    write_table.remove(last_key)?;
                 }
 
-                // remove all dl_session
-                write_table.remove(value.0.value())?;
-            }
-
-            // reinsert dl_session
-            for (i, value) in new_table.iter().enumerate() {
-                write_table.insert((i + 1) as u32, value.as_str())?;
+                write_txn.commit()?;
             }
         }
-
-        write_txn.commit()?;
 
         Ok(())
     }
