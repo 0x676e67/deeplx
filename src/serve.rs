@@ -229,11 +229,11 @@ async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Respond
         })));
     }
 
-    // Try to translate a string to verify the dl_session
-    let _ = try_translate("Hello", "EN", "ZH").await?;
-
     // Insert dl_session
     db::insert_dl_session(&form.dl_session).map_err(error::ErrorInternalServerError)?;
+
+    // Try to translate a string to verify the dl_session
+    let _ = try_translate("Hello", "EN", "ZH").await?;
 
     // Count dl_session
     let total = db::count_dl_session().map_err(error::ErrorInternalServerError)?;
@@ -323,7 +323,8 @@ async fn translate(
     // Verify the API key
     verify_api_key(req.headers(), &state).await?;
 
-    let body = try_translate(&raw_body.text, &raw_body.source_lang, &raw_body.target_lang).await?
+    let body = try_translate(&raw_body.text, &raw_body.source_lang, &raw_body.target_lang)
+        .await?
         .error_for_status()
         .map_err(error::ErrorInternalServerError)?
         .json::<Value>()
