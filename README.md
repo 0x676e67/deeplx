@@ -20,6 +20,7 @@ Rust封装的DeepL Free API服务
 ### Features
 
  - 仅支持DeepL Pro
+ - 支持WebUI/API登录
  - 支持翻译文本
  - 支持帐号池
  - 支持代理池
@@ -31,7 +32,7 @@ Rust封装的DeepL Free API服务
 GitHub Releases 中有预编译的二进制文件，以Ubuntu为例：
 
 ```bash
-wget https://github.com/gngpp/deeplx/releases/download/v0.9.40/deeplx-0.1.0-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/deeplx/releases/download/v0.1.0/deeplx-0.1.0-x86_64-unknown-linux-musl.tar.gz
 tar -xf deeplx-0.1.0-x86_64-unknown-linux-musl.tar.gz
 mv ./deeplx /bin/deeplx
 
