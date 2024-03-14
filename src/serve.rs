@@ -21,7 +21,6 @@ use anyhow::Result;
 use rand::Rng;
 use reqwest::{
     header::{self, HeaderValue},
-    impersonate::Impersonate,
     StatusCode,
 };
 use rustls::ServerConfig;
@@ -64,8 +63,7 @@ const HTML: &'static str = r#"
             margin-bottom: 20px;
         }
 
-        input[type="email"],
-        input[type="password"],
+        input[type="text"],
         input[type="submit"] {
             width: 100%;
             padding: 10px;
@@ -88,12 +86,9 @@ const HTML: &'static str = r#"
 </head>
 <body>
     <div class="container">
-        <h2>Contribute Deepl Pro</h2>
+        <h2>Contribute DL-Session</h2>
         <form method="post">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required>
+            <input type="text" id="dl_session" name="dl_session" required>
             <input type="submit" value="Submit">
         </form>
     </div>
@@ -126,8 +121,10 @@ impl Serve {
 
         // Init dl_session
         self.0.dl_session.as_ref().map(|dl_session| {
-            let _ = db::insert_dl_session(dl_session).map_err(|err| {
-                tracing::error!("Failed to insert dl_session: {err}");
+            dl_session.iter().for_each(|dl_session| {
+                db::insert_dl_session(dl_session).unwrap_or_else(|err| {
+                    tracing::error!("Failed to insert dl_session: {err}");
+                });
             });
         });
 
@@ -212,23 +209,31 @@ async fn get_pool() -> impl Responder {
 
 #[derive(Deserialize)]
 struct LoginForm {
-    email: String,
-    password: String,
+    dl_session: String,
 }
 
 async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Responder> {
-    let dl_session = auth::login(&form.email, &form.password).await?;
-
     // If dl_session is empty, return an error
-    if dl_session.is_empty() {
+    if form.dl_session.is_empty() {
         return Ok(HttpResponse::Ok().json(json!({
             "code": StatusCode::BAD_REQUEST.as_u16(),
-            "message": "Failed to get dl_session",
+            "message": "The dl_session cannot be empty.",
         })));
     }
 
+    // If dl_session contains ".", return an error
+    if form.dl_session.contains(".") {
+        return Ok(HttpResponse::Ok().json(json!({
+            "code": StatusCode::BAD_REQUEST.as_u16(),
+            "message": "Your account not a DeepL Pro account, please use a DeepL Pro account."
+        })));
+    }
+
+    // Try to translate a string to verify the dl_session
+    let _ = try_translate("Hello", "EN", "ZH").await?;
+
     // Insert dl_session
-    db::insert_dl_session(&dl_session).map_err(error::ErrorInternalServerError)?;
+    db::insert_dl_session(&form.dl_session).map_err(error::ErrorInternalServerError)?;
 
     // Count dl_session
     let total = db::count_dl_session().map_err(error::ErrorInternalServerError)?;
@@ -240,13 +245,11 @@ async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Respond
     })))
 }
 
-async fn translate(
-    req: HttpRequest,
-    bdoy: Json<PayloadFree>,
-    state: web::Data<AppState>,
-) -> actix_web::Result<impl Responder> {
-    // Verify the API key
-    verify_api_key(req.headers(), &state).await?;
+async fn try_translate(
+    text: &str,
+    source_lang: &str,
+    target_lang: &str,
+) -> actix_web::Result<reqwest::Response> {
     let id = get_random_number() + 1;
     let number_alternative = 0.clamp(0, 3);
 
@@ -256,15 +259,15 @@ async fn translate(
         "id": id,
         "params": {
             "texts": [{
-                "text": bdoy.text,
+                "text": text,
                 "requestAlternatives": number_alternative
             }],
             "splitting": "newlines",
             "lang": {
-                "source_lang_user_selected": bdoy.source_lang.to_uppercase(),
-                "target_lang": bdoy.target_lang.to_uppercase(),
+                "source_lang_user_selected": source_lang.to_uppercase(),
+                "target_lang": target_lang.to_uppercase(),
             },
-            "timestamp": get_timestamp(get_i_count(&bdoy.text))?,
+            "timestamp": get_timestamp(get_i_count(text))?,
             "commonJobParams": {
                 "wasSpoken": false,
                 "transcribe_as": ""
@@ -309,7 +312,18 @@ async fn translate(
         _ => {}
     }
 
-    let body = resp
+    Ok(resp)
+}
+
+async fn translate(
+    req: HttpRequest,
+    raw_body: Json<PayloadFree>,
+    state: web::Data<AppState>,
+) -> actix_web::Result<impl Responder> {
+    // Verify the API key
+    verify_api_key(req.headers(), &state).await?;
+
+    let body = try_translate(&raw_body.text, &raw_body.source_lang, &raw_body.target_lang).await?
         .error_for_status()
         .map_err(error::ErrorInternalServerError)?
         .json::<Value>()
@@ -351,11 +365,11 @@ async fn translate(
 
     let response = json!({
         "code": StatusCode::OK.as_u16(),
-        "id": id,
+        "id": get_random_number(),
         "data": data,
         "alternatives": alternatives,
-        "source_lang": bdoy.source_lang,
-        "target_lang": bdoy.target_lang,
+        "source_lang": raw_body.source_lang,
+        "target_lang": raw_body.target_lang,
         "method": "Free",
     });
 
@@ -441,7 +455,6 @@ impl Client {
 
     fn build_client(proxy: Option<String>) -> Result<reqwest::Client> {
         let mut builder = reqwest::Client::builder()
-            .impersonate(Impersonate::Edge122)
             .default_headers((|| {
                 let mut headers = header::HeaderMap::new();
                 headers.insert(header::USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"));
@@ -651,73 +664,5 @@ mod db {
         }
 
         Ok(())
-    }
-}
-
-mod auth {
-    use super::get_client;
-    use actix_web::error::{ErrorBadGateway, ErrorBadRequest};
-    use reqwest::header;
-    use serde_json::json;
-
-    pub async fn login(email: &str, password: &str) -> actix_web::Result<String> {
-        let client = get_client()?;
-
-        let resp = client
-            .get("https://clearance.deepl.com/token")
-            .send()
-            .await
-            .map_err(ErrorBadGateway)?;
-
-        let dl_clearance = resp
-            .cookies()
-            .find(|c| c.name() == "dl_clearance")
-            .map(|c| c.value().to_owned())
-            .ok_or_else(|| ErrorBadGateway("Failed login to get dl_clearance"))?;
-
-        let body = json!(
-            {
-                "id": 53080001,
-                "jsonrpc": "2.0",
-                "method": "login",
-                "params": {
-                    "clearanceInfo": {
-                        "status": 200,
-                        "duration": 819
-                    },
-                    "referrer": "https://www.deepl.com/es/login/",
-                    "email": email,
-                    "password": password,
-                    "version": "44",
-                    "loginDomain": "default"
-                }
-            }
-        );
-
-        let resp = client
-            .post("https://w.deepl.com/account?request_type=jsonrpc&il=es&method=login")
-            .header(header::COOKIE, format!("dl_clearance={dl_clearance};"))
-            .json(&body)
-            .send()
-            .await
-            .map_err(ErrorBadGateway)?;
-
-        // Extract dl_session
-        let dl_session = resp
-            .cookies()
-            .find(|c| c.name() == "dl_session")
-            .map(|c| c.value().to_owned())
-            .ok_or_else(|| ErrorBadGateway("Failed to get dl_session"))?;
-
-        // If dl_session is empty, return an error
-        if dl_session.is_empty() {
-            return Err(ErrorBadRequest("Failed login"));
-        }
-
-        if dl_session.contains(".") {
-            return Err(ErrorBadRequest("Your account is not a Deepl Pro account, please use a Deepl Pro account to contribute."));
-        }
-
-        Ok(dl_session)
     }
 }

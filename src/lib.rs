@@ -59,14 +59,14 @@ pub struct BootArgs {
     pub api_key: Option<String>,
 
     /// Deepl `dl_session`
-    #[clap(long)]
-    pub dl_session: Option<String>,
+    #[clap(short = 'D', long, value_parser = parse_vec,)]
+    pub dl_session: Option<std::vec::Vec<String>>,
 
     /// Deepl client proxy
-    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse_proxies_url, verbatim_doc_comment)]
+    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse_vec, verbatim_doc_comment)]
     pub proxies: Option<std::vec::Vec<String>>,
 }
 
-fn parse_proxies_url(s: &str) -> Result<std::vec::Vec<String>> {
+fn parse_vec(s: &str) -> Result<std::vec::Vec<String>> {
     Ok(s.split(',').map(|s| s.to_string()).collect())
 }

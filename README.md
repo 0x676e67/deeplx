@@ -108,7 +108,7 @@ docker run -d --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run --de
 - `tls-cert` Https证书路径
 - `tls-key` Https私钥路径
 - `-A`, `--api-key` `deeplx`的翻译接口鉴权密钥
-- `--dl-session` 可选的`dl_session`cookie值
+- `-D` `--dl-session` 可选的`dl_session`cookie值，多个`dl_session`使用`,`分隔
 - `-x`, `--proxies` 代理，支持协议`http`/`https`/`socks5`/`socks5h`，多个代理使用`,`分隔
 
 2. 启动
@@ -151,7 +151,7 @@ Options:
       --tls-cert <TLS_CERT>      TLS certificate file
       --tls-key <TLS_KEY>        TLS private key file
   -A, --api-key <API_KEY>        API key
-      --dl-session <DL_SESSION>  Deepl `dl_session`
+  -D, --dl-session <DL_SESSION>  Deepl `dl_session`
   -x, --proxies <PROXIES>        Deepl client proxy [env: PROXIES=]
   -h, --help                     Print help
 ```
