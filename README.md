@@ -59,7 +59,6 @@ deeplx log
 
 > 镜像源支持`gngpp/deeplx:latest` / `ghcr.io/gngpp/deeplx:latest`
 
-在 Docker 中，你可以使用不同的镜像源来获取 Docker 镜像。一个镜像源是一个存储和分发 Docker 镜像的仓库。Docker Hub（`gngpp/deeplx:latest`）和 GitHub Container Registry（`ghcr.io/gngpp/deeplx:latest`）就是两个常见的镜像源。
 
 你可以使用 `docker pull` 命令来从这些源获取镜像，例如：
 
