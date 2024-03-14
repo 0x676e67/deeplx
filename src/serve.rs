@@ -56,7 +56,6 @@ impl Serve {
 
         // Init dl_session
         db::insert_dl_session(self.0.dl_session.as_str())?;
-        db::insert_dl_session("40ef9830-ced3-4f4b-b391-35b98479110f")?;
 
         let api_key = self.0.api_key.clone();
 
@@ -472,6 +471,17 @@ mod db {
     pub fn insert_dl_session(dl_session: &str) -> Result<()> {
         let (_, db) = get_db();
         let write_txn = db.begin_write()?;
+        // Check dl_session exists, if not, insert
+        {
+            let table = write_txn.open_table(TABLE)?;
+            let extsts = table
+                .iter()?
+                .find(|v| v.as_ref().is_ok_and(|v| v.1.value().eq(dl_session)));
+
+            if extsts.is_some() {
+                return Ok(());
+            }
+        }
         {
             let mut table = write_txn.open_table(TABLE)?;
             let len = table.len()?;
@@ -501,5 +511,65 @@ mod db {
             }
         }
         Ok(())
+    }
+}
+
+mod auth {
+    use actix_web::error::ErrorBadGateway;
+    use reqwest::header;
+    use serde_json::json;
+
+    use super::get_client;
+
+    pub async fn login(email: &str, password: &str) -> actix_web::Result<String> {
+        let client = get_client()?;
+
+        let resp = client
+            .get("https://clearance.deepl.com/token")
+            .send()
+            .await
+            .map_err(ErrorBadGateway)?;
+
+        let dl_clearance = resp
+            .cookies()
+            .find(|c| c.name() == "dl_clearance")
+            .map(|c| c.value().to_owned())
+            .ok_or_else(|| ErrorBadGateway("Failed to get dl_clearance".to_string()))?;
+
+        let body = json!(
+            {
+                "id": 53080001,
+                "jsonrpc": "2.0",
+                "method": "login",
+                "params": {
+                    "clearanceInfo": {
+                        "status": 200,
+                        "duration": 819
+                    },
+                    "referrer": "https://www.deepl.com/es/login/",
+                    "email": email,
+                    "password": password,
+                    "version": "44",
+                    "loginDomain": "default"
+                }
+            }
+        );
+
+        let resp = client
+            .post("https://w.deepl.com/account?request_type=jsonrpc&il=es&method=login")
+            .header(header::COOKIE, format!("dl_clearance={dl_clearance};"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(ErrorBadGateway)?;
+
+        // Extract dl_session
+        let dl_session = resp
+            .cookies()
+            .find(|c| c.name() == "dl_session")
+            .map(|c| c.value().to_owned())
+            .ok_or_else(|| ErrorBadGateway("Failed to get dl_session".to_string()))?;
+
+        Ok(dl_session)
     }
 }
