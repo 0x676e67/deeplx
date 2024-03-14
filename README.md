@@ -112,7 +112,7 @@ docker run -d --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run --de
 
 2. 启动
 
-第一次启动可以不设置`-dl-session`，那么就需要在浏览器打开: `http://localhost:8000/pool`，进行手动提交到`dl_session`池中。
+第一次启动可以不设置`--dl-session`，那么就需要在浏览器打开: `http://localhost:8000/pool`，进行手动提交到`dl_session`池中。
 
 1. 命令参考
 
