@@ -13,7 +13,7 @@
 
 # deeplx
 
-Rust封装的DeepL Free API服务
+Rust封装的`DeepL Free API`服务
 
 > 使用前提是你需要有一个DeepL Pro帐号
 
@@ -35,9 +35,6 @@ GitHub Releases 中有预编译的二进制文件，以Ubuntu为例：
 wget https://github.com/gngpp/deeplx/releases/download/v0.1.0/deeplx-0.1.0-x86_64-unknown-linux-musl.tar.gz
 tar -xf deeplx-0.1.0-x86_64-unknown-linux-musl.tar.gz
 mv ./deeplx /bin/deeplx
-
-# 在线更新版本
-deeplx update
 
 # 前台运行进程
 deeplx run
