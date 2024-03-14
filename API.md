@@ -2,9 +2,9 @@
 
 ### 接口参数
 
-- `text`: 待翻译的文字
-- `source_lang`: 你当前提交的文字语言（可设置为"auto"自动识别）
-- `target_lang`: 你欲要翻译为的语言
+- `text`: 需要翻译的文本
+- `source_lang`: 提交的文本的源语言（可以设置为"auto"以自动识别）
+- `target_lang`: 你希望翻译成的目标语言
 
 ### 调用示例：
 
@@ -42,7 +42,7 @@ var requestOptions = {
   redirect: 'follow'
 };
 
-fetch("https://api.deeplx.org/translate", requestOptions)
+fetch("https://localhost:8000/translate", requestOptions)
   .then(response => response.text())
   .then(result => console.log(result))
   .catch(error => console.log('error', error));
@@ -63,7 +63,7 @@ let data = JSON.stringify({
 let config = {
   method: 'post',
   maxBodyLength: Infinity,
-  url: 'https://api.deeplx.org/translate',
+  url: 'https://localhost:8000/translate',
   headers: { 
     'Content-Type': 'application/json'
   },
@@ -87,7 +87,7 @@ axios.request(config)
 import requests
 import json
 
-url = "https://api.deeplx.org/translate"
+url = "https://localhost:8000/translate"
 
 payload = json.dumps({
   "text": "Hello, world!",
@@ -101,4 +101,21 @@ headers = {
 response = requests.request("POST", url, headers=headers, data=payload)
 
 print(response.text)
+```
+</details>
 
+## 如何在沉浸式翻译中使用
+
+首先，访问沉浸式翻译的官方网站，然后根据你的浏览器类型下载相应的插件。
+
+安装插件后，点击浏览器右上角的插件按钮，选择"沉浸式翻译"，然后进入设置页面。
+
+在左下角点击"开发者设置"，然后开启"Beta测试特性"。
+
+点击"基本设置"，然后在翻译服务中选择"DeepLX"。在"API URL"字段中填入以下API地址：
+
+```
+https://localhost:8000/translate
+```
+
+最后，点击右上角的"测试服务"按钮。如果提示服务测试成功，那么你就可以开始使用了。
