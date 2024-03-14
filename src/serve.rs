@@ -21,6 +21,7 @@ use anyhow::Result;
 use rand::Rng;
 use reqwest::{
     header::{self, HeaderValue},
+    impersonate::Impersonate,
     StatusCode,
 };
 use rustls::ServerConfig;
@@ -30,6 +31,75 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 const KEEP_ALIVE: u8 = 75;
 const CONNECTION_TIMEOUT: u8 = 10;
 const TIMEOUT: u16 = 360;
+
+const HTML: &'static str = r#"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f1f1f1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            width: 300px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="email"],
+        input[type="password"],
+        input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+
+        input[type="submit"] {
+            background-color: #0a180b;
+            color: white;
+            cursor: pointer;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #454545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Contribute Deepl Pro</h2>
+        <form method="post">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            <input type="submit" value="Submit">
+        </form>
+    </div>
+</body>
+</html>
+"#;
 
 // This struct represents state
 struct AppState {
@@ -55,7 +125,11 @@ impl Serve {
         let _ = CLIENT.set(client);
 
         // Init dl_session
-        db::insert_dl_session(self.0.dl_session.as_str())?;
+        self.0.dl_session.as_ref().map(|dl_session| {
+            if let Err(err) = db::insert_dl_session(dl_session) {
+                tracing::error!("Failed to insert dl_session: {err}");
+            }
+        });
 
         let api_key = self.0.api_key.clone();
 
@@ -81,6 +155,8 @@ impl Serve {
                     api_key: api_key.clone(),
                 }))
                 .route("/", web::get().to(manual_hello))
+                .route("/pool", web::get().to(get_pool))
+                .route("/pool", web::post().to(post_pool))
                 .route("/translate", web::post().to(translate))
         })
         .client_request_timeout(Duration::from_secs(TIMEOUT as u64))
@@ -90,7 +166,6 @@ impl Serve {
         match (&self.0.tls_cert, &self.0.tls_key) {
             (Some(cert), Some(key)) => {
                 let tls_config = Self::load_rustls_config(cert, key).await?;
-
                 builder
                     .bind_rustls_0_22(self.0.bind, tls_config)?
                     .run()
@@ -129,6 +204,40 @@ impl Serve {
 
 async fn manual_hello() -> impl Responder {
     HttpResponse::Ok().body("DeepL Free API, Developed by gngpp. Go to /translate with POST. http://github.com/gngpp/deeplx")
+}
+
+async fn get_pool() -> impl Responder {
+    HttpResponse::Ok().content_type("text/html").body(HTML)
+}
+
+#[derive(Deserialize)]
+struct LoginForm {
+    email: String,
+    password: String,
+}
+
+async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Responder> {
+    let dl_session = auth::login(&form.email, &form.password).await?;
+
+    // If dl_session is empty, return an error
+    if dl_session.is_empty() {
+        return Ok(HttpResponse::Ok().json(json!({
+            "code": StatusCode::BAD_REQUEST.as_u16(),
+            "message": "Failed to get dl_session",
+        })));
+    }
+
+    // Insert dl_session
+    db::insert_dl_session(&dl_session).map_err(error::ErrorInternalServerError)?;
+
+    // Count dl_session
+    let total = db::count_dl_session().map_err(error::ErrorInternalServerError)?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "code": StatusCode::OK.as_u16(),
+        "message": "Successfully",
+        "total": total,
+    })))
 }
 
 async fn translate(
@@ -332,6 +441,7 @@ impl Client {
 
     fn build_client(proxy: Option<String>) -> Result<reqwest::Client> {
         let mut builder = reqwest::Client::builder()
+            .impersonate(Impersonate::Edge122)
             .default_headers((|| {
                 let mut headers = header::HeaderMap::new();
                 headers.insert(header::USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"));
@@ -433,7 +543,15 @@ mod db {
         })
     }
 
-    // Round-robin dl_session
+    /// Count dl_session
+    pub fn count_dl_session() -> Result<u32> {
+        let (_, db) = get_db();
+        let read_txn = db.begin_read()?;
+        let table = read_txn.open_table(TABLE)?;
+        Ok(table.len()? as u32)
+    }
+
+    /// Round-robin dl_session
     pub fn get_dl_session() -> Result<String> {
         let (index, db) = get_db();
         let read_txn = db.begin_read()?;
@@ -474,11 +592,11 @@ mod db {
         // Check dl_session exists, if not, insert
         {
             let table = write_txn.open_table(TABLE)?;
-            let extsts = table
+            let exists = table
                 .iter()?
                 .find(|v| v.as_ref().is_ok_and(|v| v.1.value().eq(dl_session)));
 
-            if extsts.is_some() {
+            if exists.map(|v| v.ok()).flatten().is_some() {
                 return Ok(());
             }
         }
@@ -515,7 +633,7 @@ mod db {
 }
 
 mod auth {
-    use actix_web::error::ErrorBadGateway;
+    use actix_web::error::{ErrorBadGateway, ErrorBadRequest};
     use reqwest::header;
     use serde_json::json;
 
@@ -534,7 +652,7 @@ mod auth {
             .cookies()
             .find(|c| c.name() == "dl_clearance")
             .map(|c| c.value().to_owned())
-            .ok_or_else(|| ErrorBadGateway("Failed to get dl_clearance".to_string()))?;
+            .ok_or_else(|| ErrorBadGateway("Failed login to get dl_clearance".to_string()))?;
 
         let body = json!(
             {
@@ -569,6 +687,10 @@ mod auth {
             .find(|c| c.name() == "dl_session")
             .map(|c| c.value().to_owned())
             .ok_or_else(|| ErrorBadGateway("Failed to get dl_session".to_string()))?;
+
+        if dl_session.contains(".") {
+            return Err(ErrorBadRequest("Your account is not a Deepl Pro account, please use a Deepl Pro account to contribute.".to_string()));
+        }
 
         Ok(dl_session)
     }
