@@ -1,15 +1,15 @@
 [![CI](https://github.com/gngpp/deeplx/actions/workflows/release.yml/badge.svg)](https://github.com/gngpp/deeplx/actions/workflows/release.yml)
- <a target="_blank" href="https://github.com/gngpp/deeplx/blob/main/LICENSE">
-  <img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
- </a>
-  <a href="https://github.com/gngpp/deeplx/releases">
-    <img src="https://img.shields.io/github/release/gngpp/deeplx.svg?style=flat">
-  </a>
-  </a><a href="https://github.com/gngpp/deeplx/releases">
-    <img src="https://img.shields.io/github/downloads/gngpp/deeplx/total?style=flat">
-  </a>
-  [![](https://img.shields.io/docker/image-size/gngpp/deeplx)](https://registry.hub.docker.com/r/gngpp/deeplx)
-  [![Docker Image](https://img.shields.io/docker/pulls/gngpp/deeplx.svg)](https://hub.docker.com/r/gngpp/deeplx/)
+<a target="_blank" href="https://github.com/gngpp/deeplx/blob/main/LICENSE">
+<img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
+</a>
+<a href="https://github.com/gngpp/deeplx/releases">
+<img src="https://img.shields.io/github/release/gngpp/deeplx.svg?style=flat">
+</a>
+</a><a href="https://github.com/gngpp/deeplx/releases">
+<img src="https://img.shields.io/github/downloads/gngpp/deeplx/total?style=flat">
+</a>
+[![](https://img.shields.io/docker/image-size/gngpp/deeplx)](https://registry.hub.docker.com/r/gngpp/deeplx)
+[![Docker Image](https://img.shields.io/docker/pulls/gngpp/deeplx.svg)](https://hub.docker.com/r/gngpp/deeplx/)
 
 # deeplx
 
@@ -18,8 +18,6 @@ Rust封装的`DeepL Free API`服务
 ### Features
 
 - 仅支持DeepL Pro
-- 支持WebUI/API登录
-- 支持翻译文本
 - 支持池化
 - 支持代理池
 
@@ -30,8 +28,8 @@ Rust封装的`DeepL Free API`服务
 GitHub Releases 中有预编译的二进制文件，以Ubuntu为例：
 
 ```bash
-wget https://github.com/gngpp/deeplx/releases/download/v0.1.1/deeplx-0.1.1-x86_64-unknown-linux-musl.tar.gz
-tar -xf deeplx-0.1.1-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/deeplx/releases/download/v0.1.2/deeplx-0.1.2-x86_64-unknown-linux-musl.tar.gz
+tar -xf deeplx-0.1.2-x86_64-unknown-linux-musl.tar.gz
 mv ./deeplx /bin/deeplx
 
 # 前台运行进程
@@ -56,7 +54,6 @@ deeplx log
 - Docker
 
 > 镜像源支持`gngpp/deeplx:latest` / `ghcr.io/gngpp/deeplx:latest`
-
 
 你可以使用 `docker pull` 命令来从这些源获取镜像，例如：
 
