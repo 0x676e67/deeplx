@@ -15,7 +15,7 @@
 
 Rust封装的`DeepL Free API`服务
 
-## [使用API教程](https://example.com/another.md)
+## [使用API教程](https://github.com/xiaozhou26/deeplx/blob/main/API.md)
 
 > 使用前提是你需要有一个DeepL Pro帐号
 
