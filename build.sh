@@ -18,7 +18,6 @@ target_architectures=(
     "arm-unknown-linux-musleabihf"
     "armv5te-unknown-linux-musleabi"
     "i686-unknown-linux-gnu"
-    "x86_64-pc-windows-msvc"
 )
 
 pull_docker_image() {
@@ -81,33 +80,6 @@ build_linux_target() {
     mv deeplx-$tag-$1.tar.gz.sha256 $root/bin/
     cd -
 }
-
-build_windows_target() {
-    docker_image="ghcr.io/gngpp/rust-musl-cross:$1"
-
-    echo "Building $1"
-    docker run --rm -t \
-        -v $(pwd):/home/rust/src \
-        -v $HOME/.cargo/registry:/usr/local/cargo/registry \
-        -v $HOME/.cargo/git:/usr/local/cargo/git \
-        $docker_image cargo xwin build --release --target $1
-
-    sudo chmod -R 777 target
-    upx --best --lzma target/$1/release/deeplx.exe
-    cd target/$1/release
-    tar czvf deeplx-$tag-$1.tar.gz deeplx.exe
-    shasum -a 256 deeplx-$tag-$1.tar.gz >deeplx-$tag-$1.tar.gz.sha256
-    mv deeplx-$tag-$1.tar.gz $root/bin/
-    mv deeplx-$tag-$1.tar.gz.sha256 $root/bin/
-    cd -
-}
-
-if [ "$os" = "windows" ]; then
-    target="x86_64-pc-windows-msvc"
-    pull_docker_image "$target"
-    build_windows_target "$target"
-    rmi_docker_image "$target"
-fi
 
 if [ "$os" = "linux" ]; then
     target_list=(
