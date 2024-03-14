@@ -72,8 +72,6 @@ docker pull gngpp/deeplx:latest
 docker pull ghcr.io/gngpp/deeplx:latest
 ```
 
-这两个命令会从 Docker Hub 和 GitHub Container Registry 分别拉取名为 `deeplx` 的镜像的 `latest` 版本。`latest` 是 Docker 镜像的默认标签，通常表示最新的稳定版本。
-
 然后，你可以使用 `docker run` 命令来运行这个镜像，例如：
 
 ```bash
