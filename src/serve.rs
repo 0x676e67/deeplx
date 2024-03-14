@@ -124,11 +124,6 @@ impl Serve {
         let client = Client::new(self.0.proxies.clone())?;
         let _ = CLIENT.set(client);
 
-        // Init rearrange db
-        let _ = db::rearrange().map_err(|err| {
-            tracing::error!("Failed to rearrange dl_session: {err}");
-        });
-
         // Init dl_session
         self.0.dl_session.as_ref().map(|dl_session| {
             let _ = db::insert_dl_session(dl_session).map_err(|err| {
@@ -657,40 +652,13 @@ mod db {
 
         Ok(())
     }
-
-    pub fn rearrange() -> Result<()> {
-        let (_, db) = get_db();
-        let mut new_table = Vec::new();
-        let write_txn = db.begin_write()?;
-        let read_txn = db.begin_read()?;
-        let read_table = read_txn.open_table(TABLE)?;
-
-        {
-            let mut write_table = write_txn.open_table(TABLE)?;
-            // reduce dl_session
-            for value in read_table.iter()? {
-                let (key, value) = value?;
-                write_table.remove(key.value())?;
-                new_table.push(value.value().to_owned());
-            }
-
-            // reinsert dl_session
-            for (i, value) in new_table.iter().enumerate() {
-                write_table.insert((i + 1) as u32, value.as_str())?;
-            }
-        }
-
-        write_txn.commit()?;
-        Ok(())
-    }
 }
 
 mod auth {
+    use super::get_client;
     use actix_web::error::{ErrorBadGateway, ErrorBadRequest};
     use reqwest::header;
     use serde_json::json;
-
-    use super::get_client;
 
     pub async fn login(email: &str, password: &str) -> actix_web::Result<String> {
         let client = get_client()?;
@@ -705,7 +673,7 @@ mod auth {
             .cookies()
             .find(|c| c.name() == "dl_clearance")
             .map(|c| c.value().to_owned())
-            .ok_or_else(|| ErrorBadGateway("Failed login to get dl_clearance".to_string()))?;
+            .ok_or_else(|| ErrorBadGateway("Failed login to get dl_clearance"))?;
 
         let body = json!(
             {
@@ -739,10 +707,15 @@ mod auth {
             .cookies()
             .find(|c| c.name() == "dl_session")
             .map(|c| c.value().to_owned())
-            .ok_or_else(|| ErrorBadGateway("Failed to get dl_session".to_string()))?;
+            .ok_or_else(|| ErrorBadGateway("Failed to get dl_session"))?;
+
+        // If dl_session is empty, return an error
+        if dl_session.is_empty() {
+            return Err(ErrorBadRequest("Failed login"));
+        }
 
         if dl_session.contains(".") {
-            return Err(ErrorBadRequest("Your account is not a Deepl Pro account, please use a Deepl Pro account to contribute.".to_string()));
+            return Err(ErrorBadRequest("Your account is not a Deepl Pro account, please use a Deepl Pro account to contribute."));
         }
 
         Ok(dl_session)
