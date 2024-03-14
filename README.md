@@ -15,6 +15,8 @@
 
 Rust封装的`DeepL Free API`服务
 
+## [使用API教程](https://github.com/xiaozhou26/deeplx/blob/main/API.md)
+
 > 使用前提是你需要有一个DeepL Pro帐号
 
 ### Features
@@ -59,6 +61,44 @@ deeplx log
 
 > 镜像源支持`gngpp/deeplx:latest` / `ghcr.io/gngpp/deeplx:latest`
 
+
+你可以使用 `docker pull` 命令来从这些源获取镜像，例如：
+
+```bash
+docker pull gngpp/deeplx:latest
+```
+
+或者：
+
+```bash
+docker pull ghcr.io/gngpp/deeplx:latest
+```
+
+然后，你可以使用 `docker run` 命令来运行这个镜像，例如：
+
+```bash
+docker run -d -d --name deeplx -p 8000:8000 -t gngpp/deeplx:latest run
+```
+
+或者：
+
+```bash
+docker run -d --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run
+```
+
+这两个命令会运行你刚刚拉取的镜像。你可以在 `docker run -d` 命令后面添加你的程序的命令和参数，例如：
+
+```bash
+docker run -d --name deeplx -p 8000:8000 -t gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
+```
+
+或者：
+
+```bash
+docker run -d --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
+```
+
+在这些命令中，你需要将 `your_api_key`，`your_dl_session` 和 `your_proxies` 替换为你的实际值。
 ### 使用
 
 1. 启动参数说明
@@ -76,6 +116,8 @@ deeplx log
 第一次启动可以不设置`-dl-session`，那么就需要在浏览器打开: `http://localhost:8000/pool`，登录后，自动加入到帐号池中即可使用。
 
 3. 命令参考
+
+
 
 ```bash
 > deeplx -h
