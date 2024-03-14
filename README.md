@@ -117,18 +117,7 @@ docker run -it ghcr.io/gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api
 
 3. 命令参考
 
-命令:
-run 运行服务器
-start 启动服务器守护进程
-restart 重启服务器守护进程
-stop 停止服务器守护进程
-log 显示服务器守护进程日志
-ps 显示服务器守护进程
-help 打印此帮助信息或给定子命令的帮助信息
 
-选项:
--h, --help 打印帮助信息
--V, --version 打印版本信息
 
 ```bash
 > deeplx -h
@@ -166,6 +155,19 @@ Options:
   -x, --proxies <PROXIES>        Deepl client proxy [env: PROXIES=]
   -h, --help                     Print help
 ```
+
+命令:
+run 运行服务器
+start 启动服务器守护进程
+restart 重启服务器守护进程
+stop 停止服务器守护进程
+log 显示服务器守护进程日志
+ps 显示服务器守护进程
+help 打印此帮助信息或给定子命令的帮助信息
+
+选项:
+-h, --help 打印帮助信息
+-V, --version 打印版本信息
 
 ### 编译
 
