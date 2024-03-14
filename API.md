@@ -1,6 +1,3 @@
-你可以使用Markdown的代码块语法来展示这些代码示例，并使用HTML的`<details>`和`<summary>`标签来创建一个可折叠的代码块。这样，用户可以点击查看他们感兴趣的代码示例。
-
-```markdown
 ## 接口调用
 
 ### 接口参数
@@ -104,8 +101,4 @@ headers = {
 response = requests.request("POST", url, headers=headers, data=payload)
 
 print(response.text)
-```
-</details>
-```
 
-现在，每个代码示例都被包含在一个可折叠的代码块中，用户可以点击查看他们感兴趣的代码示例。注意，这种方法依赖于HTML的`<details>`和`<summary>`标签，这意味着它可能不会在所有的Markdown解析器中工作。例如，GitHub支持这些标签，但是一些其他的Markdown解析器可能不支持。
