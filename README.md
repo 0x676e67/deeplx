@@ -77,25 +77,25 @@ docker pull ghcr.io/gngpp/deeplx:latest
 然后，你可以使用 `docker run` 命令来运行这个镜像，例如：
 
 ```bash
-docker run -p 8000:8000 -t gngpp/deeplx:latest run
+docker run --name deeplx -p 8000:8000 -t gngpp/deeplx:latest run
 ```
 
 或者：
 
 ```bash
-docker run -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run
+docker run --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run
 ```
 
 这两个命令会运行你刚刚拉取的镜像。你可以在 `docker run` 命令后面添加你的程序的命令和参数，例如：
 
 ```bash
-docker run -p 8000:8000 -t gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
+docker run --name deeplx -p 8000:8000 -t gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
 ```
 
 或者：
 
 ```bash
-docker run -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
+docker run --name deeplx -p 8000:8000 -t ghcr.io/gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
 ```
 
 在这些命令中，你需要将 `your_api_key`，`your_dl_session` 和 `your_proxies` 替换为你的实际值。
