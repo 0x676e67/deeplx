@@ -59,6 +59,47 @@ deeplx log
 
 > 镜像源支持`gngpp/deeplx:latest` / `ghcr.io/gngpp/deeplx:latest`
 
+在 Docker 中，你可以使用不同的镜像源来获取 Docker 镜像。一个镜像源是一个存储和分发 Docker 镜像的仓库。Docker Hub（`gngpp/deeplx:latest`）和 GitHub Container Registry（`ghcr.io/gngpp/deeplx:latest`）就是两个常见的镜像源。
+
+你可以使用 `docker pull` 命令来从这些源获取镜像，例如：
+
+```bash
+docker pull gngpp/deeplx:latest
+```
+
+或者：
+
+```bash
+docker pull ghcr.io/gngpp/deeplx:latest
+```
+
+这两个命令会从 Docker Hub 和 GitHub Container Registry 分别拉取名为 `deeplx` 的镜像的 `latest` 版本。`latest` 是 Docker 镜像的默认标签，通常表示最新的稳定版本。
+
+然后，你可以使用 `docker run` 命令来运行这个镜像，例如：
+
+```bash
+docker run -it gngpp/deeplx:latest
+```
+
+或者：
+
+```bash
+docker run -it ghcr.io/gngpp/deeplx:latest
+```
+
+这两个命令会运行你刚刚拉取的镜像。你可以在 `docker run` 命令后面添加你的程序的命令和参数，例如：
+
+```bash
+docker run -it gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
+```
+
+或者：
+
+```bash
+docker run -it ghcr.io/gngpp/deeplx:latest run --debug --bind 0.0.0.0:8000 --api-key your_api_key --dl-session your_dl_session --proxies your_proxies
+```
+
+在这些命令中，你需要将 `your_api_key`，`your_dl_session` 和 `your_proxies` 替换为你的实际值。
 ### 使用
 
 1. 启动参数说明
