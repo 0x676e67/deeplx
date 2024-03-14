@@ -77,13 +77,13 @@ docker pull ghcr.io/gngpp/deeplx:latest
 然后，你可以使用 `docker run` 命令来运行这个镜像，例如：
 
 ```bash
-docker run -it gngpp/deeplx:latest
+docker run -it gngpp/deeplx:latest run
 ```
 
 或者：
 
 ```bash
-docker run -it ghcr.io/gngpp/deeplx:latest
+docker run -it ghcr.io/gngpp/deeplx:latest run
 ```
 
 这两个命令会运行你刚刚拉取的镜像。你可以在 `docker run` 命令后面添加你的程序的命令和参数，例如：
