@@ -229,11 +229,11 @@ async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Respond
         })));
     }
 
+    // Try to translate a string to verify the dl_session
+    let _ = try_translate(&form.dl_session, "Hello", "EN", "ZH").await?;
+
     // Insert dl_session
     db::insert_dl_session(&form.dl_session).map_err(error::ErrorInternalServerError)?;
-
-    // Try to translate a string to verify the dl_session
-    let _ = try_translate("Hello", "EN", "ZH").await?;
 
     // Count dl_session
     let total = db::count_dl_session().map_err(error::ErrorInternalServerError)?;
@@ -246,6 +246,7 @@ async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Respond
 }
 
 async fn try_translate(
+    dl_session: &str,
     text: &str,
     source_lang: &str,
     target_lang: &str,
@@ -283,12 +284,10 @@ async fn try_translate(
         body = body.replace("\"method\":\"", "\"method\": \"");
     }
 
-    let dl_session = db::round_robin_dl_session().map_err(error::ErrorExpectationFailed)?;
-
     let resp = get_client()?
         .post("https://api.deepl.com/jsonrpc")
         .header(header::CONTENT_TYPE, "application/json")
-        .header(header::COOKIE, format!("dl_session={dl_session};",))
+        .header(header::COOKIE, format!("dl_session={dl_session};"))
         .body(body)
         .send()
         .await
@@ -302,9 +301,6 @@ async fn try_translate(
         }
         // If the dl_session is invalid, remove it from the database
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-            if let Some(err) = db::remove_dl_session(dl_session).err() {
-                tracing::error!("Failed to remove dl_session: {err}");
-            }
             return Err(error::ErrorFailedDependency(
                 "Failed dependency, please check your request and try again.",
             ));
@@ -323,8 +319,25 @@ async fn translate(
     // Verify the API key
     verify_api_key(req.headers(), &state).await?;
 
-    let body = try_translate(&raw_body.text, &raw_body.source_lang, &raw_body.target_lang)
-        .await?
+    let dl_session = db::round_robin_dl_session().map_err(error::ErrorExpectationFailed)?;
+
+    let resp = match try_translate(
+        &dl_session,
+        &raw_body.text,
+        &raw_body.source_lang,
+        &raw_body.target_lang,
+    )
+    .await
+    {
+        Ok(resp) => resp,
+        Err(err) => {
+            let _ = db::remove_dl_session(dl_session)
+                .map_err(|err| tracing::error!("Failed to remove dl_session: {err}"));
+            return Err(err);
+        }
+    };
+
+    let body = resp
         .error_for_status()
         .map_err(error::ErrorInternalServerError)?
         .json::<Value>()
@@ -643,7 +656,12 @@ mod db {
     pub fn remove_dl_session(dl_session: String) -> Result<()> {
         let (_, db) = get_db();
 
-        let (key, last_key) = get_dl_session_index(&dl_session)?;
+        let (key, last_key) = match get_dl_session_index(&dl_session) {
+            Ok(res) => res,
+            Err(_) => {
+                return Ok(());
+            }
+        };
 
         match last_key {
             None => return Ok(()),
