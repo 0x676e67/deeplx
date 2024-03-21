@@ -230,7 +230,7 @@ async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Respond
     }
 
     // Try to translate a string to verify the dl_session
-    let _ = try_translate(&form.dl_session, "Hello", "EN", "ZH").await?;
+    let _ = try_translate(&form.dl_session, "Hello", "EN", "ZH", || {}).await?;
 
     // Insert dl_session
     db::insert_dl_session(&form.dl_session).map_err(error::ErrorInternalServerError)?;
@@ -245,12 +245,16 @@ async fn post_pool(form: web::Form<LoginForm>) -> actix_web::Result<impl Respond
     })))
 }
 
-async fn try_translate(
+async fn try_translate<F>(
     dl_session: &str,
     text: &str,
     source_lang: &str,
     target_lang: &str,
-) -> actix_web::Result<reqwest::Response> {
+    callback: F,
+) -> actix_web::Result<reqwest::Response>
+where
+    F: Fn() -> (),
+{
     let id = get_random_number() + 1;
     let number_alternative = 0.clamp(0, 3);
 
@@ -301,6 +305,7 @@ async fn try_translate(
         }
         // If the dl_session is invalid, remove it from the database
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+            callback();
             return Err(error::ErrorFailedDependency(
                 "Failed dependency, please check your request and try again.",
             ));
@@ -321,21 +326,18 @@ async fn translate(
 
     let dl_session = db::round_robin_dl_session().map_err(error::ErrorExpectationFailed)?;
 
-    let resp = match try_translate(
+    let resp = try_translate(
         &dl_session,
         &raw_body.text,
         &raw_body.source_lang,
         &raw_body.target_lang,
+        || {
+            if let Some(err) = db::remove_dl_session(dl_session.clone()).err() {
+                tracing::error!("Failed to remove dl_session: {err}");
+            }
+        },
     )
-    .await
-    {
-        Ok(resp) => resp,
-        Err(err) => {
-            let _ = db::remove_dl_session(dl_session)
-                .map_err(|err| tracing::error!("Failed to remove dl_session: {err}"));
-            return Err(err);
-        }
-    };
+    .await?;
 
     let body = resp
         .error_for_status()
