@@ -30,8 +30,8 @@ Rust封装的`DeepL Free API`服务
 GitHub Releases 中有预编译的二进制文件，以Ubuntu为例：
 
 ```bash
-wget https://github.com/gngpp/deeplx/releases/download/v0.1.2/deeplx-0.1.2-x86_64-unknown-linux-musl.tar.gz
-tar -xf deeplx-0.1.2-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/deeplx/releases/download/v0.1.3/deeplx-0.1.3-x86_64-unknown-linux-musl.tar.gz
+tar -xf deeplx-0.1.3-x86_64-unknown-linux-musl.tar.gz
 mv ./deeplx /bin/deeplx
 
 # 前台运行进程
